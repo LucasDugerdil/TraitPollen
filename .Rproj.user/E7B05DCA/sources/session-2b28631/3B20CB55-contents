@@ -1,0 +1,495 @@
+#### Library ####
+options("rgdal_show_exportToProj4_warnings"="none")
+library(plyr)
+library(maps)   # carte simple
+library(raster) # import data raster
+library(rgdal)  # transformation des coordinates
+
+#### Import Data ####
+#setwd("/media/lucas.dugerdil/Samsung_T5/Documents/Recherche/R_stats") 
+setwd("/home/lucas.dugerdil/Documents/Recherche/R_stats") 
+
+#### Functions ####
+# Extraction des parametres climatiques associées aux coordonées GPS des points de la DB
+# On mets la List.matrices (Pollen, Site, Taxa)
+# En sortie on ajout la matrice climat
+# On peut aussi faire afficher les cartes climatiques
+Clim.param.extraction <- function(M, Clim.cal, All.param, Season, Seasonality, Map.display, 
+                                  Altitude, Chelsa, Aridity, Biome, MAF,
+                                  Clim.display, Land.cover, Nb.map, Save.path, Save.plot, H, W){
+  #### Initialisation variable ####
+  Save.tab = T
+  if(missing(Map.display)){Map.display = F}
+  if(missing(Clim.cal)){Clim.cal = T}
+  if(missing(Chelsa)){Chelsa = F}
+  if(missing(Season)){Season = F}
+  if(missing(Seasonality)){Seasonality = F}
+  if(missing(Biome)){Biome = F}
+  if(missing(Land.cover)){Land.cover = F}
+  if(missing(Aridity)){Aridity = F}
+  if(missing(MAF)){MAF = F}
+  if(missing(All.param)){All.param = F}
+  if(missing(Clim.display)){Clim.display = T}
+  if(missing(Nb.map)){Nb.map = 1}
+  if(missing(Save.path)){Save.tab = F}
+  if(missing(Altitude)){Altitude = F}
+  if(missing(Save.plot)){Save.plot = NULL}
+  if(missing(W)){W = NULL}
+  if(missing(H)){H = NULL}
+  #### Check if data.frame or list of data.frame ####
+  if(length(M) == 3){M2 <- M$Msites}
+  else{M2 <- t(M)}
+  Lat <- c(grep("lat", row.names(M2)), grep("Lat", row.names(M2)), grep("LAT", row.names(M2)))
+  Long <- c(grep("lon", row.names(M2)), grep("Lon", row.names(M2)),grep("LON", row.names(M2)))
+  
+  #### Recuperations des coordonnées GPS ####
+  DB.coord <- data.frame(t(M2))
+  Lat <- as.numeric(M2[Lat,])
+  Long <- as.numeric(M2[Long,])
+  DB.coord.num <- data.frame(cbind(Longitude = Long, Latitude = Lat))
+  row.names(DB.coord.num) <- row.names(DB.coord)
+  DB.coord.SP <- SpatialPoints(DB.coord.num, proj4string=CRS('+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'))
+  
+  #### Clim parameters ####
+  if(Chelsa == F){
+    # Clim.path = "/media/lucas.dugerdil/Maximator/Documents/Recherche/SIG/Data_climat/WorldClim/Actual2.0/"
+    Clim.path = "/media/lucas.dugerdil/Extreme SSD/Documents/Recherche/SIG/Data_climat/WorldClim/Actual2.0/"
+    if(file.exists(Clim.path) == F){warning("The disk dure n'a pas ete branche.")}
+    Clim.param = list(
+      MAAT.path = "Bio_index/wc2.1_30s_bio/wc2.1_bio_30s_01.tif",
+      MAP.path = "Bio_index/wc2.1_30s_bio/wc2.1_bio_30s_12.tif",
+      MTWAQ.path = "Bio_index/wc2.1_30s_bio/wc2.1_bio_30s_10.tif",
+      MTCOQ.path = "Bio_index/wc2.1_30s_bio/wc2.1_bio_30s_11.tif",
+      MPWAQ.path = "Bio_index/wc2.1_30s_bio/wc2.1_bio_30s_18.tif",
+      MPCOQ.path = "Bio_index/wc2.1_30s_bio/wc2.1_bio_30s_19.tif"
+      )
+    #### Seasonality ####
+    if(Seasonality == T){
+      Clim.param2 = list(
+        TS.path = "Bio_index/wc2.1_30s_bio/wc2.1_bio_30s_04.tif",     # Temperature Seasonality [standard deviation]
+        PS.path = "Bio_index/wc2.1_30s_bio/wc2.1_bio_30s_15.tif"     # Precipitation Seasonality [coefficient of variation]
+      )
+      Clim.param <- c(Clim.param, Clim.param2)
+      }
+    
+    #### Clim param part2 ####
+    if(All.param == T){
+      Clim.param2 = list(
+        T.jan.path = "Mean_temp/wc2.1_30s_tavg/wc2.1_30s_tavg_01.tif",
+        T.fev.path = "Mean_temp/wc2.1_30s_tavg/wc2.1_30s_tavg_02.tif",
+        T.mar.path = "Mean_temp/wc2.1_30s_tavg/wc2.1_30s_tavg_03.tif",
+        T.avr.path = "Mean_temp/wc2.1_30s_tavg/wc2.1_30s_tavg_04.tif",
+        T.mai.path = "Mean_temp/wc2.1_30s_tavg/wc2.1_30s_tavg_05.tif",
+        T.juin.path = "Mean_temp/wc2.1_30s_tavg/wc2.1_30s_tavg_06.tif",
+        T.juil.path = "Mean_temp/wc2.1_30s_tavg/wc2.1_30s_tavg_07.tif",
+        T.aou.path = "Mean_temp/wc2.1_30s_tavg/wc2.1_30s_tavg_08.tif",
+        T.sep.path = "Mean_temp/wc2.1_30s_tavg/wc2.1_30s_tavg_09.tif",
+        T.oct.path = "Mean_temp/wc2.1_30s_tavg/wc2.1_30s_tavg_10.tif",
+        T.nov.path = "Mean_temp/wc2.1_30s_tavg/wc2.1_30s_tavg_11.tif",
+        T.dec.path = "Mean_temp/wc2.1_30s_tavg/wc2.1_30s_tavg_12.tif",
+        P.jan.path = "Precipitation/wc2.1_30s_prec/wc2.1_30s_prec_01.tif",
+        P.fev.path = "Precipitation/wc2.1_30s_prec/wc2.1_30s_prec_02.tif",
+        P.mar.path = "Precipitation/wc2.1_30s_prec/wc2.1_30s_prec_03.tif",
+        P.avr.path = "Precipitation/wc2.1_30s_prec/wc2.1_30s_prec_04.tif",
+        P.mai.path = "Precipitation/wc2.1_30s_prec/wc2.1_30s_prec_05.tif",
+        P.juin.path = "Precipitation/wc2.1_30s_prec/wc2.1_30s_prec_06.tif",
+        P.juil.path = "Precipitation/wc2.1_30s_prec/wc2.1_30s_prec_07.tif",
+        P.aou.path = "Precipitation/wc2.1_30s_prec/wc2.1_30s_prec_08.tif",
+        P.sep.path = "Precipitation/wc2.1_30s_prec/wc2.1_30s_prec_09.tif",
+        P.oct.path = "Precipitation/wc2.1_30s_prec/wc2.1_30s_prec_10.tif",
+        P.nov.path = "Precipitation/wc2.1_30s_prec/wc2.1_30s_prec_11.tif",
+        P.dec.path = "Precipitation/wc2.1_30s_prec/wc2.1_30s_prec_12.tif"
+        )
+      Clim.param <- c(Clim.param, Clim.param2)
+      }}
+  
+  if(Chelsa == T){
+    # Clim.path = "/media/lucas.dugerdil/Maximator/Documents/Recherche/SIG/Data_climat/Chelsa_1.2/"
+    Clim.path = "/media/lucas.dugerdil/Extreme SSD/Documents/Recherche/SIG/Data_climat/Chelsa_1.2/"
+    if(file.exists(Clim.path) == F){warning("The disk dure n'a pas ete branche.")}
+    Clim.param = list(
+      MAAT.path = "CHELSA_bio10_01.tif",     # Annual Mean Temperature [°C*10]
+      MAP.path = "CHELSA_bio10_12.tif",      # Annual Precipitation [mm/year]
+      MTWAQ.path = "CHELSA_bio10_10.tif",    # Mean Temperature of Warmest Quarter [°C*10]
+      MTCOQ.path = "CHELSA_bio10_11.tif",    # Mean Temperature of Coldest Quarter [°C*10]
+      MPWAQ.path = "CHELSA_bio10_18.tif",    # Precipitation of Warmest Quarter [mm/quarter]
+      MPCOQ.path = "CHELSA_bio10_19.tif"     # Precipitation of Coldest Quarter [mm/quarter]
+    )
+    
+    #### Seasonality ####
+    if(Seasonality == T){
+      Clim.param2 = list(
+        TS.path = "CHELSA_bio10_04.tif",     # Temperature Seasonality [standard deviation]
+        PS.path = "CHELSA_bio10_15.tif"      # Precipitation Seasonality [coefficient of variation]
+        )
+      Clim.param <- c(Clim.param, Clim.param2)
+    }
+    
+    #### Clim param part2 ####
+    if(All.param == T){
+      Clim.param2 = list(
+        MTDR.path = "CHELSA_bio10_02.tif",   # Mean Diurnal Range [°C]
+        IsoTh.path = "CHELSA_bio10_03.tif",  # Isothermality
+        MxT.path = "CHELSA_bio10_05.tif",    # Max Temperature of Warmest Month [°C*10]
+        MnT.path = "CHELSA_bio10_06.tif",    # Min Temperature of Coldest Month [°C*10]
+        TAR.path = "CHELSA_bio10_07.tif",    # Temperature Annual Range [°C*10]
+        MTWeQ.path = "CHELSA_bio10_08.tif",  # Mean Temperature of Wettest Quarter [°C*10]
+        MTDrQ.path = "CHELSA_bio10_09.tif",  # Mean Temperature of Driest Quarter [°C*10]
+        MPWeM.path = "CHELSA_bio10_13.tif",  # Precipitation of Wettest Month [mm/month]
+        MPDrM.path = "CHELSA_bio10_14.tif",  # Precipitation of Driest Month [mm/month]
+        MPWeQ.path = "CHELSA_bio10_16.tif",  # Precipitation of Wettest Quarter [mm/quarter] 
+        MPDrQ.path = "CHELSA_bio10_17.tif"   # Precipitation of Driest Quarter [mm/quarter]
+      )
+      Clim.param <- c(Clim.param, Clim.param2)
+    }}
+  
+  
+  #### Altitude ####
+  if(Altitude == T){
+    # Alt.path = "/media/lucas.dugerdil/Maximator/Documents/Recherche/SIG/MNT/"
+    Alt.path = "/media/lucas.dugerdil/Extreme SSD/Documents/Recherche/SIG/MNT/"
+    Alt.param = list(
+      Alt.WC2 = "WorldClim2_MNT/wc2.1_30s_elev.tif",
+      Alt.Mong = "Mongolia_ASTER/WGS84/DEM_Mongolia.tif",
+      Alt.Baikal = "Russie/Baikal_ASTER/Baikal_ASTER.tif",
+      Alt.Az = "Azerbaijan_SRTM/merge/SRTM_azer_merge.tif",
+      Alt.Uztaj = "SRTM_ACA/merge/DEM_SRTM_uz_taj.tif",
+      Alt.Europe1 = "Europe/EUD_CP-DEMS_3500025000-AA.tif",
+      Alt.Europe2 = "Europe/EUD_CP-DEMS_3500035000-AA.tif",
+      Alt.Europe3 = "Europe/EUD_CP-DEMS_3500045000-AA.tif",
+      Alt.Europe4 = "Europe/EUD_CP-DEMS_3500055000-AA.tif",
+      Alt.Europe5 = "Europe/EUD_CP-DEMS_4500015000-AA.tif"
+      )
+    
+    #### Extraction des valeurs altitude ####
+    for(j in 1:length(Alt.param)){
+      Alt.map = raster::raster(paste(Alt.path, Alt.param[[j]], sep = ""))
+      DB.coord.SP <- spTransform(DB.coord.SP, crs(Alt.map))
+      Alt.extract <- raster::extract(Alt.map, DB.coord.SP)
+      Name.var = gsub(".path","", names(Alt.param)[[j]])
+      DB.coord.num <- cbind(DB.coord.num, Alt.extract)
+      colnames(DB.coord.num)[ncol(DB.coord.num)] = Name.var
+    }
+  }
+  
+  #### Evapotranspiration ####
+  if(Aridity == T){
+    # Aridity.path = "/media/lucas.dugerdil/Maximator/Documents/Recherche/SIG/Data_Water/CGAR/"
+    Aridity.path = "/media/lucas.dugerdil/Extreme SSD/Documents/Recherche/SIG/Data_Water/CGAR/"
+    Aridity.param = list(AI.path = "ai_et0/ai_et0.tif")
+    #### Extraction des valeurs aridity ####
+    for(j in 1:length(Aridity.param)){
+      Aridity.map = raster::raster(paste(Aridity.path, Aridity.param[[j]], sep = ""))
+      crs(Aridity.map) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+      DB.coord.SP <- spTransform(DB.coord.SP, crs(Aridity.map))
+      Aridity.extract <- raster::extract(Aridity.map, DB.coord.SP)
+      Name.var = gsub(".path","", names(Aridity.param)[[j]])
+      DB.coord.num <- cbind(DB.coord.num, Aridity.extract)
+      colnames(DB.coord.num)[ncol(DB.coord.num)] = Name.var
+    }
+  }
+  
+  #### Biome ####
+  if(Biome == T){
+    if(exists("Pth.Dinerstein") == F){
+      # Pth.Dinerstein <- "/media/lucas.dugerdil/Maximator/Documents/Recherche/SIG/Data_vegetation/Ecoregions2017/Ecoregions2017.shp"
+      Pth.Dinerstein <- "/media/lucas.dugerdil/Extreme SSD/Documents/Recherche/SIG/Data_vegetation/Ecoregions2017/Ecoregions2017.shp"
+      biom = readOGR(Pth.Dinerstein)
+      proj4string(biom) <- CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+      }
+    Biome.extract <- data.frame(over(DB.coord.SP, biom))
+    Biome.extract <- Biome.extract[c(2,3,4)]
+    names(Biome.extract) <- c("Ecosystem", "Biome.no", "Biome")
+    DB.coord.num <- cbind(DB.coord.num, Biome.extract)
+  }
+  
+  #### Land Cover ####
+  if(Land.cover == T){
+    # Pth.GLC2000 <- "/media/lucas.dugerdil/Maximator/Documents/Recherche/SIG/Global_Land_Cover_2000/glc2000_v1_1_tif/"
+    Pth.GLC2000 <- "/media/lucas.dugerdil/Extreme SSD/Documents/Recherche/SIG/Global_Land_Cover_2000/glc2000_v1_1_tif/"
+    GLC2000.param <- list(GLC2000.path = "glc2000_v1_1.tif")
+    GLC2000.label <- data.frame(read.csv(paste(Pth.GLC2000, "leg_glc2000_v1_1.csv", sep = ""), sep = "\t" ,dec=".",header=T,row.names=1), stringsAsFactors = T)
+    # print(GLC2000.label)
+    for(j in 1:length(GLC2000.param)){
+      GLC2000.map = raster::raster(paste(Pth.GLC2000, GLC2000.param[[j]], sep = ""))
+      crs(GLC2000.map) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+      DB.coord.SP <- spTransform(DB.coord.SP, crs(GLC2000.map))
+      GLC2000.extract <- raster::extract(GLC2000.map, DB.coord.SP)
+      GLC2000.names <- GLC2000.label$CLASSNAMES[GLC2000.extract]
+      Name.var = gsub(".path","", names(GLC2000.param)[[j]])
+      DB.coord.num <- cbind(DB.coord.num, GLC2000.extract, GLC2000.names)
+      Name.var = c(Name.var, "GLC2000.lab")
+      print(Name.var)
+      print(colnames(DB.coord.num)[c(ncol(DB.coord.num)-1,ncol(DB.coord.num))])
+      colnames(DB.coord.num)[c(ncol(DB.coord.num)-1,ncol(DB.coord.num))] = Name.var
+      }
+    }
+    
+  
+  #### Extraction des valeurs clim ####
+  if(Clim.cal == T){
+    for(i in 1:length(Clim.param)){
+      Clim.map = raster(paste(Clim.path, Clim.param[[i]], sep = ""))
+      crs(Clim.map) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+      
+      DB.coord.SP <- spTransform(DB.coord.SP, crs(Clim.map))
+      Clim.extract <- raster::extract(Clim.map, DB.coord.SP)
+      Name.var = gsub(".path","", names(Clim.param)[[i]])
+      
+      if(Chelsa == T){
+        Param.divide <- c("MAAT", "MxT", "MnT", "TAR", "MTWeQ", "MTDrQ", "MTWAQ", "MTCOQ")
+        if(Name.var %in% Param.divide){Clim.extract <- Clim.extract/10}
+        }
+      
+      DB.coord.num <- cbind(DB.coord.num, Clim.extract)
+      colnames(DB.coord.num)[ncol(DB.coord.num)] = Name.var
+    }}
+  
+  #### Map display ####
+  if(Map.display == T){
+    #### Save plots ####
+    if(is.null(Save.plot) == F){
+      if(is.null(W) == F & is.null(H) == F){
+        pdf(file = Save.plot, width = W*0.01041666666667, height = H*0.01041666666667)}
+      else{pdf(file = Save.plot)}}
+    
+    #### Panel settings ####
+    if (Nb.map <= 3){par(mfrow = c(1, Nb.map), mai = c(0.6, 0.6, 0.2, 0.2))}
+    if (Nb.map == 4){par(mfrow = c(2,2), mai = c(0.6, 0.6, 0.2, 0.2))}
+    if (Nb.map >= 5 & Nb.map <= 6){par(mfrow = c(2,3), mai = c(0.6, 0.6, 0.2, 0.2))}
+    if (Nb.map >= 7 & Nb.map <= 9){par(mfrow = c(3,3), mai = c(0.6, 0.6, 0.2, 0.2))}
+    if (Nb.map >= 10 & Nb.map <= 12){par(mfrow = c(3,4), mai = c(0.6, 0.6, 0.2, 0.2))}
+    if (Nb.map >= 13 & Nb.map <= 16){par(mfrow = c(4,4), mai = c(0.6, 0.6, 0.2, 0.2))}
+    
+    #### Map settings ####
+    Xlim <- c(min(Long)-10, max(Long)+10)
+    Ylim <- c(min(Lat)-4, max(Lat)+4)
+    
+    #### Main loop ####
+    for(j in 1:Nb.map){
+      if(Clim.display == T){
+        Add.P = T
+        Clim.map = raster(paste(Clim.path, Clim.param[[j]], sep = ""))
+        Name.var = gsub(".path","", names(Clim.param)[[j]])
+        
+        plot(Clim.map, 
+             xlim = Xlim, 
+             ylim = Ylim,
+             main = Name.var,
+             col = rev(heat.colors(9, alpha = 1)),
+             xlab = "Longitude (°)",
+             ylab = "Latitude (°)"
+        )}
+      
+      if(Clim.display == F){
+        Add.P = F
+        plot.new()}
+      map("world",# regions = c("Mongolia", "China", "Japan", "Laos", "Vietnam", "India", "Russia", "Corea"), 
+          col="black", lty = "dashed", add = Add.P,
+          xlim = Xlim,
+          ylim = Ylim
+      )
+      points(DB.coord.SP,           
+             pch = 19,
+             cex = 1.5,
+             col = "gray20"
+      )
+    }
+  }
+  #### Season calculation ####
+  if(All.param == T & Season == T & Chelsa == F){
+    DB.coord.num <- data.frame(DB.coord.num)
+    DB.coord.num[["Tsum"]] <- (DB.coord.num$T.juil + DB.coord.num$T.juin + DB.coord.num$T.aou)/3
+    DB.coord.num[["Twin"]] <- (DB.coord.num$T.dec + DB.coord.num$T.jan + DB.coord.num$T.fev)/3
+    DB.coord.num[["Tfal"]] <- (DB.coord.num$T.sep + DB.coord.num$T.oct + DB.coord.num$T.nov)/3
+    DB.coord.num[["Tspr"]] <- (DB.coord.num$T.mar + DB.coord.num$T.avr + DB.coord.num$T.mai)/3
+    
+    DB.coord.num[["Psum"]] <- (DB.coord.num$P.juil + DB.coord.num$P.juin + DB.coord.num$P.aou)
+    DB.coord.num[["Pwin"]] <- (DB.coord.num$P.dec + DB.coord.num$P.jan + DB.coord.num$P.fev)
+    DB.coord.num[["Pfal"]] <- (DB.coord.num$P.sep + DB.coord.num$P.oct + DB.coord.num$P.nov)
+    DB.coord.num[["Pspr"]] <- (DB.coord.num$P.mar + DB.coord.num$P.avr + DB.coord.num$P.mai)
+  }
+  #### MAF ####
+  if(MAF == T & All.param == T & Chelsa == F){
+    MAF <- DB.coord.num[grep("T\\.", names(DB.coord.num))]
+    MAF[MAF < 0] <- NA
+    MAF <- rowMeans(MAF, na.rm = T)
+    print("pouet")
+    DB.coord.num[["MAF"]] <- MAF
+    
+  }
+  #### Return ####
+  par(mfrow = c(1,1))
+  if(length(M) == 3){M[["MClim"]] <- DB.coord.num}
+  else{M <- DB.coord.num}
+  
+  #### Altitudes merge ####
+  if(Altitude == T){
+    M <- data.frame(M)
+    A <- M[,grep(paste("^Alt.", ".", sep = ""), colnames(M))]
+    M <- M[, setdiff(1:ncol(M), grep(paste("^Alt.", ".", sep = ""), colnames(M)))]
+    #A[is.na(A)] <- 0
+    A <- round(rowMeans(A, na.rm = T), digits = 0) # Fait la moyenne entre les différents MNT
+    M <- cbind(M, Altitude = A)}
+    
+  #### Export datas ####
+  if(Save.tab == T){
+    Path.to.create <- gsub("(.*/).*\\.csv.*","\\1", Save.path)
+    dir.create(file.path(Path.to.create), showWarnings = FALSE)
+    write.table(M, file = Save.path, row.names=T, col.names=NA, sep=",", dec = ".")}
+  if(is.null(Save.plot) == F){dev.off()}
+  # print(M)
+  return(M)
+}
+
+# Fait la moyenne sur une matrice pour toutes les sites à Lat / Long equivalentes
+# Digits permet de choisir la taille de l'unité géographique 1.1°, 1.10°, 1.100°...
+Surf.aggreg.SIG <- function(MGDGT, Mgeo, Digits){
+  #### Function round DF ####
+  round_df <- function(x, digits) {
+    numeric_columns <- sapply(x, mode) == 'numeric'
+    x[numeric_columns] <-  round(x[numeric_columns], digits)
+    return(x)}
+
+  #### Aggregation ####
+  MGDGT <- cbind(MGDGT, Latitude = round(Mgeo$Latitude, digits = Digits), Longitude = round(Mgeo$Longitude, digits = Digits))
+  if(sapply(MGDGT, is.numeric)[1] == F){MGDGT <- aggregate(MGDGT, list(MGDGT$Latitude, MGDGT$Longitude), FUN = paste, collapse = " + ")}
+  else{MGDGT <- aggregate(MGDGT, list(MGDGT$Latitude, MGDGT$Longitude), FUN = mean)}
+  MGDGT <- subset(MGDGT, select = -c(Group.1, Group.2, Latitude, Longitude))
+
+  Site.N <- subset(Mgeo, select = c(Latitude, Longitude))
+  Site.N <- round_df(Site.N, Digits)
+  Site.N <- aggregate(row.names(Site.N) ~ Latitude + Longitude, data = Site.N, FUN = paste, collapse = " + ")
+  colnames(Site.N)[3] <- "Sites"
+  row.names(MGDGT)<-Site.N$Sites
+  
+  return(MGDGT)
+}
+
+# Convert les fichiers moches du CRUTS v4 extrait de google earth
+CRUTS.cleaning <- function(File.path, Clim.param.lab, Aggregation, Save.Rds){
+  #### Settings ####
+  if(missing(Clim.param.lab)){Clim.param.lab = "Param.clim"}
+  if(missing(Aggregation)){Aggregation = NULL}
+  if(missing(Save.Rds)){Save.Rds = NULL}
+  
+  #### Clean ####
+  M <- read.table(File.path, sep = "\t")
+  M <- M[-c(1:5),]
+  M <- gsub("\\s", ",", M)
+  M <- gsub(",,,,", ",", M)
+  M <- gsub(",,,", ",", M)
+  M <- gsub(",,", ",", M)
+  M <- data.frame(M)
+  M <- strsplit(as.character(M[[1]]), split = ",")
+  Keep.names <- M[1]
+  M <- data.frame(t(data.frame(M[-1])))
+  M <- data.frame(lapply(M, as.numeric))
+  row.names(M) <- paste("CP", seq(1, nrow(M)), sep = "-")
+  names(M) <- c("Year", "Month", Clim.param.lab, "Obs")
+  
+  #### Calculation ####
+  if(is.null(Aggregation) == F){
+    if(Aggregation == "sum"){
+      M <- aggregate(M, list(M[["Year"]]), FUN = sum)
+      M$Age <- -(M$Group.1 - 1950)
+      }
+    if(Aggregation == "mean"){
+      M <- aggregate(M, list(M[["Year"]]), FUN = mean)
+      M$Age <- -(M$Year - 1950)
+      }
+    M <- M[c(6,4)]
+    names(M) <- c("Age", Clim.param.lab)
+    M <- M[order(M$Age),]
+  }  
+  
+  #### Export ####
+  if(is.null(Save.Rds) == F){
+    saveRDS(M, Save.Rds)
+  }
+  # print(M)
+  return(M)
+}
+
+# Extrait l'altitude moyenne de la cellule du CRUTS et (option) converti la MAAT en fonction de l'altitude moyenne de la cellule du CRUTS 
+Alt.mean <- function(Centre.Lat, Centre.Long, Cell.size, Map.check, Site.alt, Site.MAAT){
+  if(missing(Map.check)){Map.check == F}
+  if(missing(Site.alt)){Site.alt = NULL}
+  if(missing(Site.MAAT)){Site.MAAT = NULL}
+  
+  #### Import data ####
+  Alt.path = "/media/lucas.dugerdil/Extreme SSD/Documents/Recherche/SIG/MNT/"
+  Alt.WC2 = "WorldClim2_MNT/wc2.1_30s_elev.tif"
+  Alt.map = raster::raster(paste(Alt.path, Alt.WC2, sep = ""))
+  Alt.map = raster::raster(paste(Alt.path, Alt.WC2, sep = ""))
+  
+  
+  e <- as(extent(Centre.Long - Cell.size/2, 
+                 Centre.Long + Cell.size/2, 
+                 Centre.Lat - Cell.size/2,
+                 Centre.Lat + Cell.size/2), 'SpatialPolygons')
+  crs(e) <- crs(Alt.map)
+  Alt.map <- crop(Alt.map, e)
+  
+  Mean.alt <- extract(Alt.map, e)
+  Mean.alt <- mean(Mean.alt[[1]])
+  
+  if(Map.check == T){
+    plot(Alt.map, 
+         xlab = "Longitude (°)",
+         ylab = "Latitude (°)")}
+  
+  if(is.null(Site.alt) == F & is.null(Site.MAAT) == F){
+    print("MAAT correction by the cell average altitude.")
+    MAAT.0 <- Site.MAAT + 0.0065*Mean.alt
+    MAAT.correct <- MAAT.0 - 0.0065*Site.alt
+    print(Site.MAAT)
+    print(MAAT.0)
+    print(MAAT.correct)
+  }
+  else{
+    print("Extraction of the average altitude only!")
+    return(Mean.alt)
+  }
+}
+
+
+#### Test ####
+# source("Scripts/Climat_extract.R")
+# debugSource("Scripts/Climat_extract.R")
+# Mclim.core <- Clim.param.extraction(M = Mcoord.core,
+#                                    All.param = T,
+#                                    Altitude = F,
+#                                    Season = T,
+#                                    Map.display = F,
+#                                    Clim.display = F,
+#                                    Nb.map = 2, W = 2000, H = 1000,
+#                                    Save.path = "Import/Mongolia/Site/Cores_coordinates_climat.csv")
+
+
+# Cores.dist.ERAPDB  <- data.frame(read.csv(file="Import/World_DB/Pollen/ERAPDB/ACA/ERAPDB_ACA_site.csv", sep=",",dec=".",header=T,row.names=2))        # GDGT indexe Ayrag
+# names(Cores.dist.ERAPDB)[5] <- "lat"
+# Mclim.core.erapdb <- Clim.param.extraction(M = Cores.dist.ERAPDB[1:10,], Clim.cal = T,
+#                                            All.param = F, Chelsa = T, Biome = F,
+#                                            Altitude = F, Aridity = F,
+#                                            Season = F,
+#                                            Map.display = F,
+#                                            Clim.display = F,
+#                                            Nb.map = 2, W = 2000, H = 1000,
+#                                            #Save.path = "Import/World_DB/Pollen/ERAPDB/ACA/ERAPDB_ACA_site_climat.csv"#,
+#                                            #Save.plot = "Figures/World_DB/Maps/Surface_samples_sites_ERAPDB.pdf"
+# )
+# print(Mclim.core.erapdb)
+# M <- Clim.param.extraction(M = Mclim, Clim.cal = T, MAF = T, 
+#                                All.param = T, Aridity = F, Altitude = F, Season = F, Biome = F, Map.display = F, Clim.display = F, 
+#                                Save.path = "Import/ACA/Site/My_data/SS_ACA_biom.csv")
+
+
+# T1 = CRUTS.cleaning("Import/World_DB/Climat/CRUTS_v4.04/TXT/Faz_MAP.txt", Clim.param.lab = "MAP", Aggregation = "sum",
+                    # Save.Rds = "Import/Uzbekistan/Site/CRUTS4.0/Fazilman_CRUTS_v4_MAP.Rds")
+
+
+# Alt.Faz = Alt.mean(Centre.Lat = 40.75, Centre.Long = 66.75, Cell.size = 0.5, Map.check = F,
+#                    Site.alt = Mclim.ACA[row.names(Mclim.ACA) == "Fazilman","Altitude"],
+#                    Site.MAAT = MAAT.CRUTS.Faz$MAAT_CRUTS[1]
+#                    )
