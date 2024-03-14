@@ -1,0 +1,10 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+Import/
+Resultats/
+Figures/
+Notes/
+*.pdf
+*.png
